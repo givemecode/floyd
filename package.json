@@ -2,6 +2,11 @@
   "name": "reactjs-boilerplate",
   "version": "2.3.0",
   "description": "Quick setup for new React.js applications featuring Redux, hot–reloading, PostCSS, react-router and Mocha.",
+  "husky": {
+    "hooks": {
+      "commit-msg": "./hooks/commit-msg ${GIT_PARAMS}"
+    }
+  },
   "dependencies": {
     "bcryptjs": "2.3.0",
     "fontfaceobserver": "^1.5.1",
@@ -27,6 +32,7 @@
     "eslint-plugin-react": "^3.3.2",
     "file-loader": "^0.8.4",
     "html-webpack-plugin": "^1.6.1",
+    "husky": "^0.15.0-rc.8",
     "json-loader": "^0.5.2",
     "object.assign": "^4.0.1",
     "postcss-focus": "^1.0.0",

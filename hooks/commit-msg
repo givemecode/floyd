@@ -1,0 +1,147 @@
+#!/usr/bin/python2.7
+
+from __future__ import with_statement
+
+import logging
+import sys
+import os
+import re
+import stat
+import subprocess
+
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+loglevel=logging.DEBUG
+myname = os.path.basename(sys.argv[0])
+
+def main():
+    global myname, loglevel
+    logging.basicConfig(level=loglevel, format=myname + ":%(levelname)s: %(message)s")
+
+    if myname == "commit-msg" :
+      return handle_commit_msg()
+
+    logging.error("invoked as '%s'. Need to be invoked as commit-msg, post-commit, update or post-receive" , myname)
+    return -1
+
+
+def handle_commit_msg():
+    if len(sys.argv) < 2 :
+        logging.error("No commit message filename specified")
+        return -1
+
+    commit_msg_filename = sys.argv[1]
+
+    try:
+        mode = os.stat(commit_msg_filename)[stat.ST_MODE]
+        if not stat.S_ISREG(mode):
+            logging.error("'%s' is not a valid file", commit_msg_filename)
+
+    except KeyboardInterrupt:
+        logging.info('... interrupted')
+
+    except Exception, e:
+        logging.error("Failed to open file '%s'", commit_msg_filename)
+        logging.debug(e)
+        return -1
+
+    try:
+        commit_msg_text = open(commit_msg_filename).read()
+
+    except KeyboardInterrupt:
+        logging.info('... interrupted')
+
+    except Exception, e:
+        logging.error("Failed to open file '%s'", commit_msg_filename)
+        logging.debug(e)
+        return -1
+
+    issue = get_github_issue(git_get_curr_branchname())
+    if not issue:
+      msg = "%sFailed to find any referenced Github label/issue in the branch%s\n\n" % (RED, NC)
+
+      msg += "Please use the command to rename your branch:\n"
+      msg += " _____________________________________________________\n\n"
+      msg += "| git branch -m <oldname> <label>/issue-<issue-number> |\n"
+      msg += " _____________________________________________________\n\n"
+      logging.warning(msg)
+      return -1
+
+    return validate_commit_text(commit_msg_filename, commit_msg_text, issue)
+
+
+# given a string, executes it as an executable, and returns the STDOUT
+# as a string
+def get_shell_cmd_output(cmd):
+    try:
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        return proc.stdout.read().rstrip('\n')
+    except KeyboardInterrupt:
+        logging.info("... interrupted")
+
+    except Exception, e:
+        logging.error("Failed trying to execute '%s'", cmd)
+
+# Get our current branchname
+def git_get_curr_branchname():
+    buf = get_shell_cmd_output("git branch --no-color")
+    # buf is a multiline output, each line containing a branch name
+    # the line that starts with a "*" contains the current branch name
+
+    m = re.search("^\* .*$", buf, re.MULTILINE)
+    if m == None:
+        return None
+
+    return buf[m.start()+2 : m.end()]
+
+
+def get_github_issue(branch):
+  branch_splited = branch.split('/')
+  if (
+    branch and
+    len(branch_splited) > 1 and
+    'issue' in branch_splited[1]
+  ):
+    # split the string e.g "issue-81"
+    info = branch.split('-')
+
+    label = branch_splited[0]
+    issue = info[1]
+
+    data = {
+      'label': label,
+      'issue': issue
+    }
+
+    commit_fmt = '{label} [#{issue}]' if label else '[#{issue}]'
+
+    if issue.isdigit():
+      return commit_fmt.format(**data)
+
+  return ''
+
+
+def validate_commit_text(filename, msg, issue):
+  # if not issue:
+  #   logging.error("Failed to find any referenced Github issue in commit message(s)")
+  #   return -1
+
+  # if not msg:
+  #   logging.error("Failed to find any commit message(s)")
+  #   return -1
+  if issue and msg:
+    add_issue_into_commit(filename, issue, msg)
+
+  return 0
+
+def add_issue_into_commit(filename, issue, msg):
+  with open(filename, 'w') as file:
+    file.write(' '.join([issue, '-', msg]))
+
+
+#----------------------------------------------------------------------------
+# python script entry point. Dispatches main()
+if __name__ == "__main__":
+  exit(main())
+
