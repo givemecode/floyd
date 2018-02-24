@@ -3,7 +3,9 @@
   "version": "2.3.0",
   "description": "Quick setup for new React.js applications featuring Redux, hot–reloading, PostCSS, react-router and Mocha.",
   "husky": {
-    "hooks": {}
+    "hooks": {
+      "commit-msg": "./hooks/commit-msg ${GIT_PARAMS}"
+    }
   },
   "dependencies": {
     "bcryptjs": "2.3.0",
